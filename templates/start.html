@@ -2,10 +2,8 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>能源大亨: 碳權爭霸戰 - 開始遊戲</title>
-
+    <title>能源大亨: 碳權爭霸戰</title>
     <link rel="preload" href="{{ url_for('static', filename='green_energy_bg.jpg') }}" as="image">
-    
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -14,7 +12,7 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background: linear-gradient(135deg, #2e8b57 0%, #2f4f4f 100%); /* SeaGreen to DarkSlateGray */
+            background: linear-gradient(135deg, #2e8b57 0%, #2f4f4f 100%);
             color: #f8f9fa;
         }
         .container {
@@ -66,7 +64,6 @@
             transition: background-color 0.3s;
         }
         .confirm-button:hover { background-color: #218838; }
-        #confirmation-view { display: none; }
         .join-button {
             background-color: #007bff;
             color: white;
@@ -83,49 +80,60 @@
 </head>
 <body>
     <div class="container">
-        <div id="setup-view">
-            <h1>能源大亨 🌍</h1>
-            <h2>碳權爭霸戰</h2>
-            <form id="setup-form">
-                <label for="player_count">請輸入總遊玩人數 (含關主):</label>
-                <input type="number" id="player_count" name="player_count" min="3" max="8" value="3" required>
-                <button type="submit" class="confirm-button">確定</button>
-            </form>
-        </div>
-        <div id="confirmation-view">
-            <h1>遊戲大廳</h1>
-            <p id="confirmation-text">目前遊戲已設定為 3 人遊玩。</p>
-            <a href="{{ url_for('role_selection') }}" class="join-button">進入角色選擇</a>
-        </div>
+
+        {% if game_in_progress %}
+            <div id="lobby-view">
+                <h1>遊戲進行中</h1>
+                <p>目前遊戲已設定為 {{ player_count }} 人遊玩。</p>
+                <a href="{{ url_for('role_selection') }}" class="join-button">前往角色選擇</a>
+            </div>
+
+        {% else %}
+            <div id="setup-view">
+                <h1>能源大亨 🌍</h1>
+                <h2>碳權爭霸戰</h2>
+                <form id="setup-form">
+                    <label for="player_count">請輸入總遊玩人數 (含關主):</label>
+                    <input type="number" id="player_count" name="player_count" min="3" max="8" value="3" required>
+                    <button type="submit" class="confirm-button">確定</button>
+                </form>
+            </div>
+            <div id="confirmation-view" style="display: none;">
+                <h1>遊戲大廳</h1>
+                <p id="confirmation-text"></p>
+                <a href="{{ url_for('role_selection') }}" class="join-button">進入角色選擇</a>
+            </div>
+        {% endif %}
+
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        const socket = io();
-        const setupView = document.getElementById('setup-view');
-        const confirmationView = document.getElementById('confirmation-view');
-        const confirmationText = document.getElementById('confirmation-text');
-        const setupForm = document.getElementById('setup-form');
-        const playerCountInput = document.getElementById('player_count');
+        // 這段 JS 只在遊戲未開始時才需要執行
+        {% if not game_in_progress %}
+            const socket = io();
+            const setupView = document.getElementById('setup-view');
+            const confirmationView = document.getElementById('confirmation-view');
+            const confirmationText = document.getElementById('confirmation-text');
+            const setupForm = document.getElementById('setup-form');
+            const playerCountInput = document.getElementById('player_count');
 
-        // 確保 setupForm 元素存在後再綁定事件
-        if (setupForm) {
-            setupForm.addEventListener('submit', function (event) {
-                event.preventDefault(); // 防止頁面傳統的提交跳轉
-                const playerCount = playerCountInput.value;
-                // 透過 WebSocket 發送設定給伺服器
-                socket.emit('setup_game', { player_count: playerCount });
-            });
-        }
-
-        // 監聽來自伺服器的 game_is_ready 事件
-        socket.on('game_is_ready', function(data) {
-            if (confirmationText && setupView && confirmationView) {
-                confirmationText.innerText = `目前遊戲已設定為 ${data.player_count} 人遊玩。`;
-                setupView.style.display = 'none';
-                confirmationView.style.display = 'block';
+            if (setupForm) {
+                setupForm.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    const playerCount = playerCountInput.value;
+                    socket.emit('setup_game', { player_count: playerCount });
+                });
             }
-        });
+
+            socket.on('game_is_ready', function(data) {
+                if (confirmationText && setupView && confirmationView) {
+                    confirmationText.innerText = `目前遊戲已設定為 ${data.player_count} 人遊玩。`;
+                    setupView.style.display = 'none';
+                    confirmationView.style.display = 'block';
+                }
+            });
+        {% endif %}
     </script>
 </body>
 </html>

@@ -114,6 +114,11 @@
         const socket = io();
         const currentPlayerRole = {{ role|tojson }};
 
+        // *** 新增：頁面載入後，立刻向伺服器註冊自己的角色 ***
+            socket.on('connect', function() {
+                socket.emit('register_role', { role: currentPlayerRole });
+            });
+
         socket.on('update_state', function(gameState) {
             if (gameState.hasOwnProperty(currentPlayerRole)) {
                 const playerData = gameState[currentPlayerRole];
