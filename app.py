@@ -32,8 +32,8 @@ def select_role():
     
     if selected_role in available_roles:
         available_roles.remove(selected_role)
-        with app.app_context():
-            socketio.emit('role_taken', {'role': selected_role})
+        # *** 修改點：移除此處的 with app.app_context() ***
+        socketio.emit('role_taken', {'role': selected_role})
         return redirect(url_for('player_page', role_name=selected_role))
         
     return redirect(url_for('role_selection'))
@@ -62,8 +62,8 @@ def update_player_data():
             amount = int(amount_str)
             GAME_STATE[player_to_update][resource_type] += amount
             GAME_STATE['關主'][resource_type] -= amount
-            with app.app_context():
-                socketio.emit('update_state', GAME_STATE)
+            # *** 修改點：移除此處的 with app.app_context() ***
+            socketio.emit('update_state', GAME_STATE)
         except ValueError:
             pass
             
@@ -72,8 +72,8 @@ def update_player_data():
 @app.route('/end_game', methods=['POST'])
 def end_game():
     reset_game_state()
-    with app.app_context():
-        socketio.emit('game_over')
+    # *** 修改點：移除此處的 with app.app_context() ***
+    socketio.emit('game_over')
     return redirect(url_for('main_entry'))
 
 # --- WebSocket 事件處理 ---
@@ -103,6 +103,7 @@ def handle_setup_game(data):
         GAME_STATE = temp_game_state
         available_roles = list(GAME_STATE.keys())
         
+        # 在 WebSocket 事件中，保留 app_context 是更安全的做法
         with app.app_context():
             socketio.emit('game_is_ready', {'player_count': player_count})
 
@@ -117,7 +118,7 @@ def handle_register_role(data):
 @socketio.on('disconnect')
 def handle_disconnect():
     print(f"一位使用者已斷線! SID: {request.sid}")
-    # *** 修改點：我們將自動重置的邏輯暫時停用，以解決頁面跳轉的bug ***
+    # *** 保留此處的 with app.app_context()，因為 'disconnect' 是背景事件 ***
     # if request.sid and request.sid == gm_sid:
     #     print("關主已斷線，正在重置遊戲...")
     #     reset_game_state()
