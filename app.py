@@ -32,7 +32,6 @@ def select_role():
     
     if selected_role in available_roles:
         available_roles.remove(selected_role)
-        # *** 修改點：為 emit 加上 app_context，增加穩健性 ***
         with app.app_context():
             socketio.emit('role_taken', {'role': selected_role})
         return redirect(url_for('player_page', role_name=selected_role))
@@ -63,7 +62,6 @@ def update_player_data():
             amount = int(amount_str)
             GAME_STATE[player_to_update][resource_type] += amount
             GAME_STATE['關主'][resource_type] -= amount
-            # 在 HTTP 路由中直接 emit 通常沒問題，但加上 context 更保險
             with app.app_context():
                 socketio.emit('update_state', GAME_STATE)
         except ValueError:
@@ -119,12 +117,12 @@ def handle_register_role(data):
 @socketio.on('disconnect')
 def handle_disconnect():
     print(f"一位使用者已斷線! SID: {request.sid}")
-    if request.sid and request.sid == gm_sid:
-        print("關主已斷線，正在重置遊戲...")
-        reset_game_state()
-        # *** 修改點：為 emit 加上 app_context，解決 502 錯誤的關鍵 ***
-        with app.app_context():
-            socketio.emit('game_over')
+    # *** 修改點：我們將自動重置的邏輯暫時停用，以解決頁面跳轉的bug ***
+    # if request.sid and request.sid == gm_sid:
+    #     print("關主已斷線，正在重置遊戲...")
+    #     reset_game_state()
+    #     with app.app_context():
+    #         socketio.emit('game_over')
 
 def reset_game_state():
     global GAME_STATE, available_roles, game_in_progress, total_player_count, gm_sid
