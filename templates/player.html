@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ role }} - 個人儀表板</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #343a40;
+            transition: background-image 0.5s ease-in-out;
+        }
+        .dashboard {
+            /* *** 修改點：改為與關主儀表板一致的半透明淡綠色 *** */
+            background-color: rgba(240, 250, 240, 0.9);
+            padding: 30px 50px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            min-width: 350px;
+            backdrop-filter: blur(8px); /* 毛玻璃效果 */
+            border: 1px solid rgba(255, 255, 255, 0.2); /* 加上細微邊框增加質感 */
+        }
+        h1 {
+            color: #343a40;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .stats {
+            list-style: none;
+            padding: 0;
+        }
+        .stats li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.8em;
+            background-color: rgba(255, 255, 255, 0.7);
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .stats .label {
+            font-weight: bold;
+            color: #6c757d;
+        }
+        .stats .value {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .gm-dashboard-link, .end-game-link {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .gm-dashboard-link a, .end-game-link button {
+            display: inline-block;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            border: none;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .gm-dashboard-link a { background-color: #dc3545; }
+        .gm-dashboard-link a:hover { background-color: #c82333; }
+        .end-game-link button { background-color: #6c757d; }
+        .end-game-link button:hover { background-color: #5a6268; }
+    </style>
+</head>
+<body id="player-body">
+    <div class="dashboard">
+        <h1>{{ role }} 的儀表板</h1>
+        <ul class="stats">
+            <li>
+                <span class="label">💰 金錢</span>
+                <span class="value" id="money-value">${{ data.money }}</span>
+            </li>
+            <li>
+                <span class="label">🍃 碳匯</span>
+                <span class="value" id="carbon-value">{{ data.carbon }} 單位</span>
+            </li>
+        </ul>
+
+        {% if role == '關主' %}
+        <div class="gm-dashboard-link">
+            <a href="{{ url_for('gm_dashboard') }}">進入關主儀表板</a>
+        </div>
+        <div class="end-game-link">
+            <form action="{{ url_for('end_game') }}" method="post" style="margin: 0;">
+                <button type="submit">結束遊戲</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        // 設定所有玩家的背景
+        const playerBody = document.getElementById('player-body');
+        playerBody.style.backgroundImage = `url("{{ url_for('static', filename='green_energy_bg.jpg') }}")`;
+        playerBody.style.backgroundSize = 'cover';
+        playerBody.style.backgroundPosition = 'center';
+        playerBody.style.backgroundAttachment = 'fixed';
+
+        // 以下是即時更新邏輯
+        const socket = io();
+        const currentPlayerRole = {{ role|tojson }};
+
+        socket.on('update_state', function(gameState) {
+            if (gameState.hasOwnProperty(currentPlayerRole)) {
+                const playerData = gameState[currentPlayerRole];
+                document.getElementById('money-value').innerText = '$' + playerData.money;
+                document.getElementById('carbon-value').innerText = playerData.carbon + ' 單位';
+            }
+        });
+
+        socket.on('game_over', function() {
+            alert('遊戲已由關主結束!');
+            window.location.href = "{{ url_for('main_entry') }}";
+        });
+    </script>
+</body>
+</html>
