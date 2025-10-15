@@ -17,10 +17,11 @@ gm_sid = None  # *** 新增：用來儲存關主的 session ID ***
 # 1. 遊戲入口
 @app.route('/')
 def main_entry():
-    if game_in_progress:
-        return render_template('lobby.html', player_count=total_player_count)
-    else:
-        return render_template('start.html')
+    # 無論遊戲是否開始，都渲染同一個 start.html 範本
+    # 只是多傳送 game_in_progress 和 total_player_count 變數給前端
+    return render_template('start.html', 
+                           game_in_progress=game_in_progress, 
+                           player_count=total_player_count)
 
 # 2. 角色選擇頁面
 @app.route('/roles')
