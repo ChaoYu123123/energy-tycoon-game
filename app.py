@@ -130,4 +130,46 @@ def handle_join_room(data):
 
 @socketio.on('start_game')
 def handle_start_game():
-    global game
+    global game_in_progress, total_player_count, available_roles, GAME_STATE
+    
+    print(f"收到開始遊戲請求，來自: {request.sid}")
+
+    # 1. 權限檢查：只有房主可以開始遊戲
+    if request.sid != HOST_SID:
+        print("錯誤：非房主嘗試開始遊戲")
+        return
+
+    # 2. 人數檢查：至少 2 人
+    current_count = len(CONNECTED_PLAYERS)
+    print(f"目前連線人數: {current_count}")
+    
+    if current_count < 2:
+        print("錯誤：人數不足")
+        # 發送錯誤訊息給房主
+        socketio.emit('error_message', {'msg': '人數不足，至少需要 2 人才能開始！'}, to=request.sid)
+        return
+
+    # 3. 遊戲初始化邏輯
+    if not game_in_progress:
+        game_in_progress = True
+        total_player_count = current_count
+        
+        # 建立角色：1 ~ N-1 是玩家，最後一個是關主
+        player_names = [f"玩家{i}" for i in range(1, current_count)]
+        player_names.append("關主")
+        
+        # 初始化資源狀態
+        temp_game_state = {}
+        for name in player_names:
+            if name == "關主":
+                temp_game_state[name] = {"money": 9999, "carbon": 999}
+            else:
+                temp_game_state[name] = {"money": 200, "carbon": 5}
+        
+        GAME_STATE = temp_game_state
+        available_roles = list(GAME_STATE.keys())
+        
+        print(f"遊戲開始! 角色列表: {available_roles}")
+        
+        # 4. 廣播跳轉指令 (直接 emit，不要加 with app.app_context)
+        socketio.emit('game_started_redirect')
