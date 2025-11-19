@@ -162,19 +162,26 @@ def handle_join_room(data):
         emit('error_message', {'msg': '找不到此房間號碼'})
 
 @socketio.on('start_game')
-def handle_start_game():
-    room_code = get_room() # 從 session 拿房號
+def handle_start_game(data): # 1. 這裡增加接收 data 參數
+    # 2. 優先從前端傳來的 data 取得房號，如果沒有才嘗試從 session 拿
+    room_code = data.get('room_code') if data else get_room()
     
+    print(f"收到開始遊戲請求。來源SID: {request.sid}, 房號: {room_code}")
+
     if not room_code or room_code not in ROOMS:
+        print("錯誤：找不到對應的房間資料")
+        emit('error_message', {'msg': '系統找不到此房間，請嘗試重新整理頁面'})
         return
         
     room_data = ROOMS[room_code]
     
     # 權限檢查
     if request.sid != room_data['host_sid']:
+        print(f"權限錯誤：請求者 {request.sid} 不是房主 {room_data['host_sid']}")
         return
 
     current_count = len(room_data['connected_sids'])
+    print(f"目前房間人數: {current_count}")
     
     if current_count < 2:
         emit('error_message', {'msg': '人數不足，至少需要 2 人才能開始！'})
@@ -197,7 +204,7 @@ def handle_start_game():
         room_data['game_state'] = temp_game_state
         room_data['available_roles'] = list(temp_game_state.keys())
         
-        print(f"房間 {room_code} 遊戲開始! 人數: {current_count}")
+        print(f"房間 {room_code} 遊戲正式開始! 廣播跳轉中...")
         
         # 只通知該房間的人跳轉
         socketio.emit('game_started_redirect', room=room_code)

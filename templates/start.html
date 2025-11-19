@@ -116,10 +116,15 @@
             }
         });
 
-        // 開始遊戲
-        btnStart.addEventListener('click', () => {
-            socket.emit('start_game');
-        });
+	// 事件監聽: 開始遊戲
+	btnStart.addEventListener('click', () => {
+    		// 從畫面上的顯示元素取得當前的房號
+    		const currentCode = displayCode.innerText;
+    		console.log("發送開始遊戲請求，房號:", currentCode);
+    
+    		// 將房號傳送給伺服器
+    		socket.emit('start_game', { room_code: currentCode });
+	});
 
         socket.on('room_created', (data) => {
             homeView.classList.remove('active-view');
