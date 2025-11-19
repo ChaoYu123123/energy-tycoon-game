@@ -23,38 +23,13 @@
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
             text-align: center;
             min-width: 400px;
+            transition: all 0.3s ease;
         }
-        h1 {
-            font-size: 2.8em;
-            color: #343a40;
-            margin-top: 0;
-            margin-bottom: 10px;
-        }
-        h2 {
-            font-size: 1.5em;
-            color: #28a745;
-            margin-bottom: 40px;
-        }
-        form {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-        label {
-            font-size: 1.2em;
-        }
-        input[type="number"] {
-            padding: 12px;
-            font-size: 1.1em;
-            width: 100px;
-            text-align: center;
-            border-radius: 8px;
-            border: 1px solid #ced4da;
-        }
-        .confirm-button {
-            background-color: #28a745;
-            color: white;
+        h1 { font-size: 2.8em; color: #343a40; margin-top: 0; margin-bottom: 10px; }
+        h2 { font-size: 1.5em; color: #28a745; margin-bottom: 40px; }
+        
+        /* 按鈕樣式 */
+        .btn {
             border: none;
             padding: 15px 30px;
             border-radius: 8px;
@@ -62,78 +37,185 @@
             font-weight: bold;
             cursor: pointer;
             transition: background-color 0.3s;
+            width: 100%;
+            margin-top: 10px;
         }
-        .confirm-button:hover { background-color: #218838; }
-        .join-button {
-            background-color: #007bff;
-            color: white;
-            padding: 15px 30px;
+        .btn-green { background-color: #28a745; color: white; }
+        .btn-green:hover { background-color: #218838; }
+        .btn-blue { background-color: #007bff; color: white; }
+        .btn-blue:hover { background-color: #0069d9; }
+        .btn-disabled { background-color: #cccccc; cursor: not-allowed; }
+
+        input[type="text"] {
+            padding: 15px;
+            font-size: 1.5em;
+            width: 80%;
+            text-align: center;
             border-radius: 8px;
-            font-size: 1.2em;
-            font-weight: bold;
-            text-decoration: none;
-            transition: background-color 0.3s;
+            border: 2px solid #ced4da;
+            letter-spacing: 5px;
+            margin-bottom: 20px;
         }
-        .join-button:hover { background-color: #0069d9; }
-        p { font-size: 1.3em; }
+        
+        .room-code-display {
+            font-size: 3em;
+            font-weight: bold;
+            color: #007bff;
+            letter-spacing: 10px;
+            margin: 20px 0;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px dashed #ced4da;
+        }
+        
+        .player-count {
+            font-size: 1.2em;
+            color: #6c757d;
+            margin-top: 20px;
+        }
+
+        /* 控制顯示隱藏 */
+        .view-section { display: none; }
+        .active-view { display: block; }
     </style>
 </head>
 <body>
     <div class="container">
+        <h1>能源大亨 🌍</h1>
+        <h2>碳權爭霸戰</h2>
 
-        {% if game_in_progress %}
-            <div id="lobby-view">
-                <h1>遊戲進行中</h1>
-                <p>目前遊戲已設定為 {{ player_count }} 人遊玩。</p>
-                <a href="{{ url_for('role_selection') }}" class="join-button">前往角色選擇</a>
-            </div>
+        <div id="create-view" class="view-section">
+            <p>目前沒有進行中的遊戲</p>
+            <button id="btn-create" class="btn btn-green">建立新房間</button>
+        </div>
 
-        {% else %}
-            <div id="setup-view">
-                <h1>能源大亨 🌍</h1>
-                <h2>碳權爭霸戰</h2>
-                <form id="setup-form">
-                    <label for="player_count">請輸入總遊玩人數 (含關主):</label>
-                    <input type="number" id="player_count" name="player_count" min="3" max="8" value="3" required>
-                    <button type="submit" class="confirm-button">確定</button>
-                </form>
-            </div>
-            <div id="confirmation-view" style="display: none;">
-                <h1>遊戲大廳</h1>
-                <p id="confirmation-text"></p>
-                <a href="{{ url_for('role_selection') }}" class="join-button">進入角色選擇</a>
-            </div>
-        {% endif %}
+        <div id="join-view" class="view-section">
+            <p>請輸入房主提供的 6 位數房號</p>
+            <input type="text" id="input-room-code" maxlength="6" placeholder="------">
+            <button id="btn-join" class="btn btn-blue">加入房間</button>
+        </div>
 
+        <div id="waiting-view" class="view-section">
+            <p>等待玩家加入中...</p>
+            <div id="display-code" class="room-code-display">------</div>
+            <div class="player-count">目前人數: <span id="count-val">1</span> 人</div>
+            
+            <button id="btn-start" class="btn btn-green" style="display: none;">開始遊戲</button>
+            <p id="waiting-msg" style="display: none;">請等待房主開始遊戲...</p>
+        </div>
+        
+        <div id="running-view" class="view-section">
+            <p>遊戲已經在進行中，無法加入。</p>
+        </div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        // 這段 JS 只在遊戲未開始時才需要執行
-        {% if not game_in_progress %}
-            const socket = io();
-            const setupView = document.getElementById('setup-view');
-            const confirmationView = document.getElementById('confirmation-view');
-            const confirmationText = document.getElementById('confirmation-text');
-            const setupForm = document.getElementById('setup-form');
-            const playerCountInput = document.getElementById('player_count');
+        const socket = io();
+        
+        // 來自後端的初始狀態 (由 Jinja2 渲染)
+        const initialMode = "{{ view_mode }}"; 
 
-            if (setupForm) {
-                setupForm.addEventListener('submit', function (event) {
-                    event.preventDefault();
-                    const playerCount = playerCountInput.value;
-                    socket.emit('setup_game', { player_count: playerCount });
-                });
+        // DOM 元素
+        const createView = document.getElementById('create-view');
+        const joinView = document.getElementById('join-view');
+        const waitingView = document.getElementById('waiting-view');
+        const runningView = document.getElementById('running-view');
+        
+        const btnCreate = document.getElementById('btn-create');
+        const btnJoin = document.getElementById('btn-join');
+        const btnStart = document.getElementById('btn-start');
+        
+        const inputCode = document.getElementById('input-room-code');
+        const displayCode = document.getElementById('display-code');
+        const countVal = document.getElementById('count-val');
+        const waitingMsg = document.getElementById('waiting-msg');
+
+        // 初始化畫面
+        function initView() {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
+            
+            if (initialMode === 'empty') {
+                createView.classList.add('active-view');
+            } else if (initialMode === 'active') {
+                joinView.classList.add('active-view');
+            } else {
+                runningView.classList.add('active-view');
             }
+        }
+        initView();
 
-            socket.on('game_is_ready', function(data) {
-                if (confirmationText && setupView && confirmationView) {
-                    confirmationText.innerText = `目前遊戲已設定為 ${data.player_count} 人遊玩。`;
-                    setupView.style.display = 'none';
-                    confirmationView.style.display = 'block';
-                }
-            });
-        {% endif %}
+        // 事件監聽: 建立房間
+        btnCreate.addEventListener('click', () => {
+            socket.emit('create_room');
+        });
+
+        // 事件監聽: 加入房間
+        btnJoin.addEventListener('click', () => {
+            const code = inputCode.value;
+            if (code.length === 6) {
+                socket.emit('join_game_room', { code: code });
+            } else {
+                alert('請輸入完整的 6 位數號碼');
+            }
+        });
+
+        // 事件監聽: 開始遊戲
+        btnStart.addEventListener('click', () => {
+            socket.emit('start_game');
+        });
+
+        // Socket 回應: 房間建立成功
+        socket.on('room_created', (data) => {
+            createView.classList.remove('active-view');
+            waitingView.classList.add('active-view');
+            
+            displayCode.innerText = data.code;
+            if (data.is_host) {
+                btnStart.style.display = 'block'; // 房主顯示開始按鈕
+            }
+        });
+
+        // Socket 回應: 加入房間成功
+        socket.on('room_joined', (data) => {
+            joinView.classList.remove('active-view');
+            waitingView.classList.add('active-view');
+            
+            // 顯示輸入的房號
+            displayCode.innerText = inputCode.value; 
+            
+            if (!data.is_host) {
+                waitingMsg.style.display = 'block'; // 訪客顯示等待訊息
+            }
+        });
+
+        // Socket 回應: 更新人數
+        socket.on('update_player_list', (data) => {
+            countVal.innerText = data.count;
+        });
+
+        // Socket 回應: 遊戲開始跳轉
+        socket.on('game_started_redirect', () => {
+            window.location.href = "{{ url_for('role_selection') }}";
+        });
+
+        // Socket 回應: 錯誤訊息
+        socket.on('error_message', (data) => {
+            alert(data.msg);
+        });
+        
+        // Socket 回應: 房主斷線
+        socket.on('host_disconnected', () => {
+            alert('房主已斷線，房間已關閉。');
+            window.location.reload(); // 重新整理回到首頁
+        });
+
+        // 每次連線都檢查一次狀態，避免畫面不同步
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
     </script>
 </body>
 </html>
