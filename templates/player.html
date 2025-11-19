@@ -15,15 +15,15 @@
             transition: background-image 0.5s ease-in-out;
         }
         .dashboard {
-            /* *** 修改點：改為與關主儀表板一致的半透明淡綠色 *** */
+            /* 半透明淡綠色風格 */
             background-color: rgba(240, 250, 240, 0.9);
             padding: 30px 50px;
             border-radius: 15px;
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
             text-align: center;
             min-width: 350px;
-            backdrop-filter: blur(8px); /* 毛玻璃效果 */
-            border: 1px solid rgba(255, 255, 255, 0.2); /* 加上細微邊框增加質感 */
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         h1 {
             color: #343a40;
@@ -103,22 +103,23 @@
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        // 設定所有玩家的背景
+        // 設定背景圖片
         const playerBody = document.getElementById('player-body');
         playerBody.style.backgroundImage = `url("{{ url_for('static', filename='green_energy_bg.jpg') }}")`;
         playerBody.style.backgroundSize = 'cover';
         playerBody.style.backgroundPosition = 'center';
         playerBody.style.backgroundAttachment = 'fixed';
 
-        // 以下是即時更新邏輯
         const socket = io();
         const currentPlayerRole = {{ role|tojson }};
 
-        // *** 新增：頁面載入後，立刻向伺服器註冊自己的角色 ***
-            socket.on('connect', function() {
-                socket.emit('register_role', { role: currentPlayerRole });
-            });
+        // *** 關鍵修改：連線後註冊身分並重新加入房間 ***
+        socket.on('connect', function() {
+            socket.emit('rejoin_room_request');
+            socket.emit('register_role', { role: currentPlayerRole });
+        });
 
+        // 即時更新數據
         socket.on('update_state', function(gameState) {
             if (gameState.hasOwnProperty(currentPlayerRole)) {
                 const playerData = gameState[currentPlayerRole];
@@ -127,8 +128,9 @@
             }
         });
 
+        // 遊戲結束跳轉
         socket.on('game_over', function() {
-            alert('遊戲已由關主結束!');
+            alert('遊戲已結束！');
             window.location.href = "{{ url_for('main_entry') }}";
         });
     </script>

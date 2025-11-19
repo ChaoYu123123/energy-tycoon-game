@@ -7,75 +7,40 @@
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; margin: 0;
             background: linear-gradient(135deg, #2e8b57 0%, #2f4f4f 100%);
             color: #f8f9fa;
         }
         .container {
-            background-color: #ffffff;
-            color: #343a40;
-            padding: 40px 50px;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            min-width: 400px;
-            transition: all 0.3s ease;
+            background-color: #ffffff; color: #343a40; padding: 40px 50px;
+            border-radius: 15px; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            text-align: center; min-width: 400px; transition: all 0.3s ease;
         }
-        h1 { font-size: 2.8em; color: #343a40; margin-top: 0; margin-bottom: 10px; }
+        h1 { font-size: 2.8em; margin: 0 0 10px; color: #343a40; }
         h2 { font-size: 1.5em; color: #28a745; margin-bottom: 40px; }
-        
-        /* 按鈕樣式 */
         .btn {
-            border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            font-size: 1.2em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            width: 100%;
-            margin-top: 10px;
+            border: none; padding: 15px 30px; border-radius: 8px;
+            font-size: 1.2em; font-weight: bold; cursor: pointer;
+            width: 100%; margin-top: 10px; transition: 0.3s;
         }
         .btn-green { background-color: #28a745; color: white; }
         .btn-green:hover { background-color: #218838; }
         .btn-blue { background-color: #007bff; color: white; }
         .btn-blue:hover { background-color: #0069d9; }
-        .btn-disabled { background-color: #cccccc; cursor: not-allowed; }
-
+        
         input[type="text"] {
-            padding: 15px;
-            font-size: 1.5em;
-            width: 80%;
-            text-align: center;
-            border-radius: 8px;
-            border: 2px solid #ced4da;
-            letter-spacing: 5px;
-            margin-bottom: 20px;
+            padding: 15px; font-size: 1.5em; width: 80%;
+            text-align: center; border-radius: 8px; border: 2px solid #ced4da;
+            letter-spacing: 5px; margin-bottom: 20px;
         }
-        
         .room-code-display {
-            font-size: 3em;
-            font-weight: bold;
-            color: #007bff;
-            letter-spacing: 10px;
-            margin: 20px 0;
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 10px;
-            border: 2px dashed #ced4da;
+            font-size: 3em; font-weight: bold; color: #007bff;
+            letter-spacing: 10px; margin: 20px 0;
+            background-color: #f8f9fa; padding: 10px;
+            border-radius: 10px; border: 2px dashed #ced4da;
         }
-        
-        .player-count {
-            font-size: 1.2em;
-            color: #6c757d;
-            margin-top: 20px;
-        }
-
-        /* 控制顯示隱藏 */
+        .player-count { font-size: 1.2em; color: #6c757d; margin-top: 20px; }
         .view-section { display: none; }
         .active-view { display: block; }
     </style>
@@ -85,15 +50,16 @@
         <h1>能源大亨 🌍</h1>
         <h2>碳權爭霸戰</h2>
 
-        <div id="create-view" class="view-section">
-            <p>目前沒有進行中的遊戲</p>
-            <button id="btn-create" class="btn btn-green">建立新房間</button>
+        <div id="home-view" class="view-section active-view">
+            <button id="btn-to-create" class="btn btn-green">建立房間</button>
+            <button id="btn-to-join" class="btn btn-blue">加入房間</button>
         </div>
 
         <div id="join-view" class="view-section">
-            <p>請輸入房主提供的 6 位數房號</p>
+            <p>請輸入 6 位數房號</p>
             <input type="text" id="input-room-code" maxlength="6" placeholder="------">
-            <button id="btn-join" class="btn btn-blue">加入房間</button>
+            <button id="btn-confirm-join" class="btn btn-blue">加入</button>
+            <button onclick="showHome()" class="btn" style="background: #ccc;">返回</button>
         </div>
 
         <div id="waiting-view" class="view-section">
@@ -104,27 +70,19 @@
             <button id="btn-start" class="btn btn-green" style="display: none;">開始遊戲</button>
             <p id="waiting-msg" style="display: none;">請等待房主開始遊戲...</p>
         </div>
-        
-        <div id="running-view" class="view-section">
-            <p>遊戲已經在進行中，無法加入。</p>
-        </div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         const socket = io();
         
-        // 來自後端的初始狀態 (由 Jinja2 渲染)
-        const initialMode = "{{ view_mode }}"; 
-
-        // DOM 元素
-        const createView = document.getElementById('create-view');
+        const homeView = document.getElementById('home-view');
         const joinView = document.getElementById('join-view');
         const waitingView = document.getElementById('waiting-view');
-        const runningView = document.getElementById('running-view');
         
-        const btnCreate = document.getElementById('btn-create');
-        const btnJoin = document.getElementById('btn-join');
+        const btnToCreate = document.getElementById('btn-to-create');
+        const btnToJoin = document.getElementById('btn-to-join');
+        const btnConfirmJoin = document.getElementById('btn-confirm-join');
         const btnStart = document.getElementById('btn-start');
         
         const inputCode = document.getElementById('input-room-code');
@@ -132,27 +90,24 @@
         const countVal = document.getElementById('count-val');
         const waitingMsg = document.getElementById('waiting-msg');
 
-        // 初始化畫面
-        function initView() {
+        function showHome() {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
-            
-            if (initialMode === 'empty') {
-                createView.classList.add('active-view');
-            } else if (initialMode === 'active') {
-                joinView.classList.add('active-view');
-            } else {
-                runningView.classList.add('active-view');
-            }
+            homeView.classList.add('active-view');
         }
-        initView();
 
-        // 事件監聽: 建立房間
-        btnCreate.addEventListener('click', () => {
+        // 建立房間
+        btnToCreate.addEventListener('click', () => {
             socket.emit('create_room');
         });
 
-        // 事件監聽: 加入房間
-        btnJoin.addEventListener('click', () => {
+        // 切換到加入畫面
+        btnToJoin.addEventListener('click', () => {
+            homeView.classList.remove('active-view');
+            joinView.classList.add('active-view');
+        });
+
+        // 確認加入
+        btnConfirmJoin.addEventListener('click', () => {
             const code = inputCode.value;
             if (code.length === 6) {
                 socket.emit('join_game_room', { code: code });
@@ -161,61 +116,28 @@
             }
         });
 
-        // 事件監聽: 開始遊戲
+        // 開始遊戲
         btnStart.addEventListener('click', () => {
             socket.emit('start_game');
         });
 
-        // Socket 回應: 房間建立成功
         socket.on('room_created', (data) => {
-            createView.classList.remove('active-view');
+            homeView.classList.remove('active-view');
             waitingView.classList.add('active-view');
-            
             displayCode.innerText = data.code;
-            if (data.is_host) {
-                btnStart.style.display = 'block'; // 房主顯示開始按鈕
-            }
+            if (data.is_host) btnStart.style.display = 'block';
         });
 
-        // Socket 回應: 加入房間成功
         socket.on('room_joined', (data) => {
             joinView.classList.remove('active-view');
             waitingView.classList.add('active-view');
-            
-            // 顯示輸入的房號
-            displayCode.innerText = inputCode.value; 
-            
-            if (!data.is_host) {
-                waitingMsg.style.display = 'block'; // 訪客顯示等待訊息
-            }
+            displayCode.innerText = inputCode.value;
+            if (!data.is_host) waitingMsg.style.display = 'block';
         });
 
-        // Socket 回應: 更新人數
-        socket.on('update_player_list', (data) => {
-            countVal.innerText = data.count;
-        });
-
-        // Socket 回應: 遊戲開始跳轉
-        socket.on('game_started_redirect', () => {
-            window.location.href = "{{ url_for('role_selection') }}";
-        });
-
-        // Socket 回應: 錯誤訊息
-        socket.on('error_message', (data) => {
-            alert(data.msg);
-        });
-        
-        // Socket 回應: 房主斷線
-        socket.on('host_disconnected', () => {
-            alert('房主已斷線，房間已關閉。');
-            window.location.reload(); // 重新整理回到首頁
-        });
-
-        // 每次連線都檢查一次狀態，避免畫面不同步
-        socket.on('connect', () => {
-            console.log('Connected to server');
-        });
-
+        socket.on('update_player_list', (data) => countVal.innerText = data.count);
+        socket.on('game_started_redirect', () => window.location.href = "{{ url_for('role_selection') }}");
+        socket.on('error_message', (data) => alert(data.msg));
     </script>
 </body>
 </html>

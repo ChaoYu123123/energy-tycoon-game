@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>選擇您的角色</title>
+    <title>選擇您的能源公司</title>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -11,16 +11,20 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: #a3b9a8; /* 柔和的備援色 */
+            /* 背景圖設定 */
+            background-color: #a3b9a8;
+            background-image: url("{{ url_for('static', filename='green_energy_bg.jpg') }}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
             
-            /* *** 關鍵修改 1：預設將頁面內容設為隱藏 *** */
+            /* 預設隱藏內容以防閃爍 */
             visibility: hidden;
-            /* 加入一個平滑的淡入效果，提升體驗 */
-            transition: visibility 0s, opacity 0.5s linear;
             opacity: 0;
+            transition: visibility 0s, opacity 0.5s linear;
         }
 
-        /* *** 新增：當 body 加上 .loaded class 時，讓它可見並淡入 *** */
+        /* 圖片載入完成後顯示 */
         body.loaded {
             visibility: visible;
             opacity: 1;
@@ -68,7 +72,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>請選擇您的角色 👤</h1>
+        <h1>請選擇您的能源公司 👤</h1>
         {% if roles %}
             <form action="{{ url_for('select_role') }}" method="post" class="role-buttons">
                 {% for role in roles %}
@@ -86,37 +90,29 @@
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        // *** 關鍵修改 2：加入圖片載入後才顯示頁面的邏輯 ***
+        // --- 防止白屏閃爍邏輯 ---
         document.addEventListener('DOMContentLoaded', function() {
             const body = document.body;
             const bgImageUrl = "{{ url_for('static', filename='green_energy_bg.jpg') }}";
-            
-            // 建立一個圖片物件在背景載入
             const img = new Image();
             img.src = bgImageUrl;
-            
-            // 當圖片載入完成時執行
             img.onload = function() {
-                // 1. 設定背景
                 body.style.backgroundImage = `url(${bgImageUrl})`;
-                body.style.backgroundSize = 'cover';
-                body.style.backgroundPosition = 'center';
-                body.style.backgroundAttachment = 'fixed';
-                
-                // 2. 透過加入 class 來觸發 CSS 的淡入效果
                 body.classList.add('loaded');
             };
-            
-            // (可選的錯誤處理) 如果圖片載入失敗，也顯示頁面，只是沒有背景圖
             img.onerror = function() {
-                console.error('背景圖片載入失敗！');
-                body.classList.add('loaded'); // 即使失敗也要顯示內容
+                body.classList.add('loaded');
             }
         });
 
-
-        // 以下是原本的 Socket.IO 邏輯，維持不變
         const socket = io();
+
+        // *** 關鍵修改：連線後立刻要求重新加入房間 ***
+        // 這解決了重新整理頁面後，SocketID 改變導致收不到廣播的問題
+        socket.on('connect', function() {
+            socket.emit('rejoin_room_request');
+        });
+
         socket.on('role_taken', function(data) {
             const buttonToRemove = document.querySelector(`button[value="${data.role}"]`);
             if (buttonToRemove) {
