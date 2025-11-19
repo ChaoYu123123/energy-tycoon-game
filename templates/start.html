@@ -2,45 +2,93 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>能源大亨: 碳權爭霸戰</title>
+    <title>能源大亨: 碳權爭霸戰 - 開始遊戲</title>
+    
+    <!-- 預先載入背景圖 -->
     <link rel="preload" href="{{ url_for('static', filename='green_energy_bg.jpg') }}" as="image">
+    
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
-            display: flex; justify-content: center; align-items: center;
-            height: 100vh; margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            /* 深綠色漸層背景 */
             background: linear-gradient(135deg, #2e8b57 0%, #2f4f4f 100%);
             color: #f8f9fa;
         }
         .container {
-            background-color: #ffffff; color: #343a40; padding: 40px 50px;
-            border-radius: 15px; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-            text-align: center; min-width: 400px; transition: all 0.3s ease;
+            background-color: #ffffff;
+            color: #343a40;
+            padding: 40px 50px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            min-width: 400px;
+            transition: all 0.3s ease;
         }
-        h1 { font-size: 2.8em; margin: 0 0 10px; color: #343a40; }
-        h2 { font-size: 1.5em; color: #28a745; margin-bottom: 40px; }
+        h1 {
+            font-size: 2.8em;
+            color: #343a40;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        h2 {
+            font-size: 1.5em;
+            color: #28a745;
+            margin-bottom: 40px;
+        }
+        
+        /* 按鈕樣式 */
         .btn {
-            border: none; padding: 15px 30px; border-radius: 8px;
-            font-size: 1.2em; font-weight: bold; cursor: pointer;
-            width: 100%; margin-top: 10px; transition: 0.3s;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%;
+            margin-top: 10px;
         }
         .btn-green { background-color: #28a745; color: white; }
         .btn-green:hover { background-color: #218838; }
         .btn-blue { background-color: #007bff; color: white; }
         .btn-blue:hover { background-color: #0069d9; }
-        
+        .btn-disabled { background-color: #cccccc; cursor: not-allowed; }
+
         input[type="text"] {
-            padding: 15px; font-size: 1.5em; width: 80%;
-            text-align: center; border-radius: 8px; border: 2px solid #ced4da;
-            letter-spacing: 5px; margin-bottom: 20px;
+            padding: 15px;
+            font-size: 1.5em;
+            width: 80%;
+            text-align: center;
+            border-radius: 8px;
+            border: 2px solid #ced4da;
+            letter-spacing: 5px;
+            margin-bottom: 20px;
         }
+        
         .room-code-display {
-            font-size: 3em; font-weight: bold; color: #007bff;
-            letter-spacing: 10px; margin: 20px 0;
-            background-color: #f8f9fa; padding: 10px;
-            border-radius: 10px; border: 2px dashed #ced4da;
+            font-size: 3em;
+            font-weight: bold;
+            color: #007bff;
+            letter-spacing: 10px;
+            margin: 20px 0;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px dashed #ced4da;
         }
-        .player-count { font-size: 1.2em; color: #6c757d; margin-top: 20px; }
+        
+        .player-count {
+            font-size: 1.2em;
+            color: #6c757d;
+            margin-top: 20px;
+        }
+
+        /* 控制顯示隱藏 */
         .view-section { display: none; }
         .active-view { display: block; }
     </style>
@@ -50,11 +98,13 @@
         <h1>能源大亨 🌍</h1>
         <h2>碳權爭霸戰</h2>
 
+        <!-- 1. 初始畫面 (選擇建立或加入) -->
         <div id="home-view" class="view-section active-view">
             <button id="btn-to-create" class="btn btn-green">建立房間</button>
             <button id="btn-to-join" class="btn btn-blue">加入房間</button>
         </div>
 
+        <!-- 2. 加入房間畫面 -->
         <div id="join-view" class="view-section">
             <p>請輸入 6 位數房號</p>
             <input type="text" id="input-room-code" maxlength="6" placeholder="------">
@@ -62,20 +112,24 @@
             <button onclick="showHome()" class="btn" style="background: #ccc;">返回</button>
         </div>
 
+        <!-- 3. 等待室畫面 -->
         <div id="waiting-view" class="view-section">
             <p>等待玩家加入中...</p>
             <div id="display-code" class="room-code-display">------</div>
             <div class="player-count">目前人數: <span id="count-val">1</span> 人</div>
             
+            <!-- 只有房主看得到開始按鈕 -->
             <button id="btn-start" class="btn btn-green" style="display: none;">開始遊戲</button>
             <p id="waiting-msg" style="display: none;">請等待房主開始遊戲...</p>
         </div>
+        
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         const socket = io();
         
+        // DOM 元素
         const homeView = document.getElementById('home-view');
         const joinView = document.getElementById('join-view');
         const waitingView = document.getElementById('waiting-view');
@@ -90,23 +144,24 @@
         const countVal = document.getElementById('count-val');
         const waitingMsg = document.getElementById('waiting-msg');
 
+        // 返回首頁函式
         function showHome() {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
             homeView.classList.add('active-view');
         }
 
-        // 建立房間
+        // 事件監聽: 建立房間
         btnToCreate.addEventListener('click', () => {
             socket.emit('create_room');
         });
 
-        // 切換到加入畫面
+        // 事件監聽: 切換到加入畫面
         btnToJoin.addEventListener('click', () => {
             homeView.classList.remove('active-view');
             joinView.classList.add('active-view');
         });
 
-        // 確認加入
+        // 事件監聽: 確認加入
         btnConfirmJoin.addEventListener('click', () => {
             const code = inputCode.value;
             if (code.length === 6) {
@@ -116,33 +171,60 @@
             }
         });
 
-	// 事件監聽: 開始遊戲
-	btnStart.addEventListener('click', () => {
-    		// 從畫面上的顯示元素取得當前的房號
-    		const currentCode = displayCode.innerText;
-    		console.log("發送開始遊戲請求，房號:", currentCode);
-    
-    		// 將房號傳送給伺服器
-    		socket.emit('start_game', { room_code: currentCode });
-	});
+        // 事件監聽: 開始遊戲
+        btnStart.addEventListener('click', () => {
+            // 從畫面上的顯示元素取得當前的房號，傳給後端
+            const currentCode = displayCode.innerText;
+            console.log("發送開始遊戲請求，房號:", currentCode);
+            socket.emit('start_game', { room_code: currentCode });
+        });
 
+        // Socket 回應: 房間建立成功
         socket.on('room_created', (data) => {
             homeView.classList.remove('active-view');
             waitingView.classList.add('active-view');
+            
             displayCode.innerText = data.code;
-            if (data.is_host) btnStart.style.display = 'block';
+            if (data.is_host) {
+                btnStart.style.display = 'block'; // 房主顯示開始按鈕
+            }
         });
 
+        // Socket 回應: 加入房間成功
         socket.on('room_joined', (data) => {
             joinView.classList.remove('active-view');
             waitingView.classList.add('active-view');
-            displayCode.innerText = inputCode.value;
-            if (!data.is_host) waitingMsg.style.display = 'block';
+            
+            // 顯示輸入的房號
+            displayCode.innerText = inputCode.value; 
+            
+            if (!data.is_host) {
+                waitingMsg.style.display = 'block'; // 訪客顯示等待訊息
+            }
         });
 
-        socket.on('update_player_list', (data) => countVal.innerText = data.count);
-        socket.on('game_started_redirect', () => window.location.href = "{{ url_for('role_selection') }}");
-        socket.on('error_message', (data) => alert(data.msg));
+        // Socket 回應: 更新人數
+        socket.on('update_player_list', (data) => {
+            countVal.innerText = data.count;
+        });
+
+        // Socket 回應: 遊戲開始跳轉
+        // 接收後端傳來的 roomCode，並將其附加到網址參數中
+        socket.on('game_started_redirect', (roomCode) => {
+            window.location.href = "{{ url_for('role_selection') }}?room=" + roomCode;
+        });
+
+        // Socket 回應: 錯誤訊息
+        socket.on('error_message', (data) => {
+            alert(data.msg);
+        });
+        
+        // Socket 回應: 房主斷線
+        socket.on('host_disconnected', () => {
+            alert('房主已斷線，房間已關閉。');
+            window.location.reload(); // 重新整理回到首頁
+        });
+
     </script>
 </body>
 </html>

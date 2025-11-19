@@ -3,8 +3,8 @@ from flask_socketio import SocketIO, join_room, leave_room, emit
 import random
 
 app = Flask(__name__)
-app.secret_key = 'secret_key_for_session_management' # 請務必設定一個密鑰
-socketio = SocketIO(app, manage_session=False) # 手動管理 Session 以避免衝突
+app.secret_key = 'secret_key_for_session_management' # 設定 Session 密鑰
+socketio = SocketIO(app, manage_session=False) # 手動管理 Session
 
 # --- 多房間儲存區 ---
 # 結構: { '房號': { 'game_state': {}, 'game_in_progress': False, 'host_sid': '...', ... } }
@@ -18,15 +18,20 @@ def get_room():
 
 @app.route('/')
 def main_entry():
-    # 清除舊的 session，確保每次進首頁都是新的開始
+    # 每次進首頁都視為新的開始
     session.clear()
     return render_template('start.html')
 
 @app.route('/roles')
 def role_selection():
-    room_code = get_room()
+    # 優先從網址參數 (?room=...) 取得房號，如果沒有才看 session
+    room_code = request.args.get('room') or session.get('room_code')
+    
     if not room_code or room_code not in ROOMS:
         return redirect(url_for('main_entry'))
+    
+    # *** 關鍵：在這裡重新確認並設定 Session ***
+    session['room_code'] = room_code
     
     room_data = ROOMS[room_code]
     if not room_data['game_in_progress']:
@@ -90,14 +95,14 @@ def update_player_data():
 def end_game():
     room_code = get_room()
     if room_code in ROOMS:
-        # 1. 廣播結束事件給房間內所有人 (這會觸發前端跳轉)
+        # 1. 廣播結束事件給房間內所有人
         socketio.emit('game_over', room=room_code)
         
         # 2. 刪除房間數據
         del ROOMS[room_code]
         print(f"房間 {room_code} 已關閉")
         
-    # 3. 關主自己跳轉回首頁
+    # 3. 關主跳轉回首頁
     return redirect(url_for('main_entry'))
 
 # --- WebSocket 事件處理 ---
@@ -108,23 +113,25 @@ def handle_connect():
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    # 尋找該 SID 在哪個房間
+    # 尋找該 SID 在哪個房間並移除
     for code, data in ROOMS.items():
         if request.sid in data['connected_sids']:
             data['connected_sids'].remove(request.sid)
-            # 更新該房間的人數
             socketio.emit('update_player_list', {'count': len(data['connected_sids'])}, room=code)
+            
+            # 如果房主在遊戲開始前斷線，關閉房間
+            if request.sid == data['host_sid'] and not data['game_in_progress']:
+                 del ROOMS[code]
+                 socketio.emit('host_disconnected', room=code)
             break
 
 @socketio.on('create_room')
 def handle_create_room():
-    # 生成不重複房號
     while True:
         new_code = str(random.randint(100000, 999999))
         if new_code not in ROOMS:
             break
             
-    # 初始化房間數據
     ROOMS[new_code] = {
         'host_sid': request.sid,
         'connected_sids': [request.sid],
@@ -133,9 +140,7 @@ def handle_create_room():
         'available_roles': []
     }
     
-    # 將 Socket 加入房間頻道
     join_room(new_code)
-    # 儲存房號到 Session (重要！)
     session['room_code'] = new_code
     
     print(f"房間 {new_code} 已建立")
@@ -162,26 +167,20 @@ def handle_join_room(data):
         emit('error_message', {'msg': '找不到此房間號碼'})
 
 @socketio.on('start_game')
-def handle_start_game(data): # 1. 這裡增加接收 data 參數
-    # 2. 優先從前端傳來的 data 取得房號，如果沒有才嘗試從 session 拿
+def handle_start_game(data):
+    # 優先從前端傳來的 data 取得房號
     room_code = data.get('room_code') if data else get_room()
     
-    print(f"收到開始遊戲請求。來源SID: {request.sid}, 房號: {room_code}")
-
     if not room_code or room_code not in ROOMS:
-        print("錯誤：找不到對應的房間資料")
-        emit('error_message', {'msg': '系統找不到此房間，請嘗試重新整理頁面'})
         return
         
     room_data = ROOMS[room_code]
     
     # 權限檢查
     if request.sid != room_data['host_sid']:
-        print(f"權限錯誤：請求者 {request.sid} 不是房主 {room_data['host_sid']}")
         return
 
     current_count = len(room_data['connected_sids'])
-    print(f"目前房間人數: {current_count}")
     
     if current_count < 2:
         emit('error_message', {'msg': '人數不足，至少需要 2 人才能開始！'})
@@ -190,7 +189,6 @@ def handle_start_game(data): # 1. 這裡增加接收 data 參數
     if not room_data['game_in_progress']:
         room_data['game_in_progress'] = True
         
-        # 建立角色
         player_names = [f"玩家{i}" for i in range(1, current_count)]
         player_names.append("關主")
         
@@ -204,12 +202,12 @@ def handle_start_game(data): # 1. 這裡增加接收 data 參數
         room_data['game_state'] = temp_game_state
         room_data['available_roles'] = list(temp_game_state.keys())
         
-        print(f"房間 {room_code} 遊戲正式開始! 廣播跳轉中...")
+        print(f"房間 {room_code} 遊戲開始! 人數: {current_count}")
         
-        # 只通知該房間的人跳轉
-        socketio.emit('game_started_redirect', room=room_code)
+        # 廣播跳轉指令，並帶上 room_code
+        socketio.emit('game_started_redirect', room_code, room=room_code)
 
-# 讓玩家重新連上 socket 時重新加入房間 (解決頁面跳轉後 socket 斷開問題)
+# 讓玩家重新連上 socket 時重新加入房間
 @socketio.on('rejoin_room_request')
 def handle_rejoin():
     room_code = get_room()
@@ -217,8 +215,6 @@ def handle_rejoin():
         join_room(room_code)
         print(f"SID {request.sid} 重新連線至房間 {room_code}")
 
-# 註冊角色身分 (用於背景圖判斷等)
 @socketio.on('register_role')
 def handle_register_role(data):
-    # 這裡可以依需求擴充
     pass
