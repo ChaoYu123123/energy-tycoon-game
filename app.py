@@ -21,9 +21,15 @@ CONNECTED_PLAYERS = []
 
 @app.route('/')
 def main_entry():
-    room_status = 'active' if ROOM_CODE else 'empty'
+    # 判斷顯示邏輯：
+    # 1. 如果遊戲正在進行 -> 顯示「遊戲進行中」
+    # 2. 如果有房間但沒開始 -> 顯示「加入房間」
+    # 3. 如果沒房間 -> 顯示「建立房間」
+    
     if game_in_progress:
         return render_template('start.html', view_mode='game_running')
+        
+    room_status = 'active' if ROOM_CODE else 'empty'
     return render_template('start.html', view_mode=room_status)
 
 @app.route('/roles')
@@ -37,7 +43,7 @@ def select_role():
     selected_role = request.form.get('role')
     if selected_role in available_roles:
         available_roles.remove(selected_role)
-        # 廣播角色被選走 (不需要 app_context，因為這是 HTTP 請求)
+        # 一般 HTTP 路由中直接 emit
         socketio.emit('role_taken', {'role': selected_role})
         return redirect(url_for('player_page', role_name=selected_role))
     return redirect(url_for('role_selection'))
@@ -47,7 +53,6 @@ def player_page(role_name):
     if role_name in GAME_STATE:
         return render_template('player.html', role=role_name, data=GAME_STATE[role_name])
     else:
-        # 如果玩家狀態不見了，回到首頁
         return redirect(url_for('main_entry'))
 
 @app.route('/gm')
@@ -75,8 +80,7 @@ def update_player_data():
 @app.route('/end_game', methods=['POST'])
 def end_game():
     reset_game_state()
-    with app.app_context():
-        socketio.emit('game_over')
+    socketio.emit('game_over')
     return redirect(url_for('main_entry'))
 
 # --- WebSocket 事件處理 ---
@@ -92,14 +96,11 @@ def handle_disconnect():
     
     if request.sid in CONNECTED_PLAYERS:
         CONNECTED_PLAYERS.remove(request.sid)
+        # 更新等待室人數
         socketio.emit('update_player_list', {'count': len(CONNECTED_PLAYERS)})
-
-    # *** 重要修正：移除「房主斷線自動重置」的邏輯 ***
-    # 因為當房主跳轉頁面（例如從等待室->選角->個人頁面）時，
-    # 瀏覽器會觸發 disconnect，導致遊戲被錯誤重置。
-    # 我們改由「結束遊戲」按鈕來手動重置，這樣比較穩定。
-    # if request.sid == HOST_SID:
-    #     print("房主已斷線...") 
+    
+    # 移除「房主斷線自動重置」以避免誤判
+    # 如果需要重置，請使用「結束遊戲」按鈕
 
 @socketio.on('create_room')
 def handle_create_room():
@@ -129,9 +130,4 @@ def handle_join_room(data):
 
 @socketio.on('start_game')
 def handle_start_game():
-    global game_in_progress, total_player_count, available_roles, GAME_STATE
-    
-    if request.sid != HOST_SID:
-        return
-
-    current_count = len(CONNECTED_PLAYERS)
+    global game
