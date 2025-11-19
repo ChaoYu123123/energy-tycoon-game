@@ -79,8 +79,16 @@ def update_player_data():
 
 @app.route('/end_game', methods=['POST'])
 def end_game():
-    reset_game_state()
-    socketio.emit('game_over')
+    try:
+        reset_game_state()
+        # 嘗試廣播，如果有錯會被下方的 except 抓到
+        socketio.emit('game_over')
+        print("遊戲已正常結束，廣播已發送。")
+    except Exception as e:
+        # 如果發生錯誤，這裡會印出具體原因，但不會讓網頁崩潰
+        print(f"❌ 結束遊戲時發生錯誤: {e}")
+    
+    # 無論是否出錯，都強制導回首頁
     return redirect(url_for('main_entry'))
 
 # --- WebSocket 事件處理 ---
